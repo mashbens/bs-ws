@@ -1,0 +1,11 @@
+go 1.23.3
+
+use (
+	./main-runner
+	./worker-browsesnap
+	./worker-browsesnap2
+	./worker-browsesnap3
+	./worker-browsesnap4
+	./worker-browsesnap5
+	./worker-browsesnap6
+)
