@@ -1,0 +1,70 @@
+🔁 Loop ke-1
+✅ sukses tsk: 637901
+✅ sukses clt: 201 Created
+✅ today task completed = 13
+✅ next payment 396640
+✅ Loop ke-1 selesai
+🎉 Worker worker-browsesnap2 selesai
+[worker-browsesnap2][2025-07-28 18:53:06] 🚀 Menjalankan worker di /home/bens/project/myrepo/bs-ws/worker-browsesnap2
+[worker-browsesnap2][2025-07-28 18:53:06] 🔁 Loop ke-1
+[worker-browsesnap2][2025-07-28 18:53:06] 🔧 Menjalankan perintah: go run main.go
+✅ sukses tsk: 638256
+✅ sukses clt: 201 Created
+✅ today task completed = 24
+✅ next payment 397520
+[worker-browsesnap2][2025-07-28 18:53:13] ✅ Loop ke-1 selesai
+[worker-browsesnap2][2025-07-28 18:53:13] 🔁 Loop ke-2
+[worker-browsesnap2][2025-07-28 18:53:14] 🔧 Menjalankan perintah: go run main.go
+✅ sukses tsk: 638253
+✅ sukses clt: 201 Created
+✅ today task completed = 25
+✅ next payment 397600
+[worker-browsesnap2][2025-07-28 18:53:20] ✅ Loop ke-2 selesai
+[worker-browsesnap2][2025-07-28 18:53:20] 🔁 Loop ke-3
+[worker-browsesnap2][2025-07-28 18:53:20] 🔧 Menjalankan perintah: go run main.go
+✅ sukses tsk: 638251
+✅ sukses clt: 201 Created
+✅ today task completed = 26
+✅ next payment 397680
+[worker-browsesnap2][2025-07-28 18:53:27] ✅ Loop ke-3 selesai
+[worker-browsesnap2][2025-07-28 18:53:27] 🔁 Loop ke-4
+[worker-browsesnap2][2025-07-28 18:53:27] 🔧 Menjalankan perintah: go run main.go
+⚠️  Tidak ada task valid, retry...
+✅ sukses tsk: 638270
+✅ sukses clt: 201 Created
+✅ today task completed = 27
+✅ next payment 397760
+[worker-browsesnap2][2025-07-28 18:53:39] ✅ Loop ke-4 selesai
+[worker-browsesnap2][2025-07-28 18:53:39] 🔁 Loop ke-5
+[worker-browsesnap2][2025-07-28 18:53:39] 🔧 Menjalankan perintah: go run main.go
+⚠️  Tidak ada task valid, retry...
+⚠️  Tidak ada task valid, retry...
+✅ sukses tsk: 638321
+✅ sukses clt: 201 Created
+✅ today task completed = 28
+✅ next payment 397840
+[worker-browsesnap2][2025-07-28 18:53:52] ✅ Loop ke-5 selesai
+[worker-browsesnap2][2025-07-28 18:53:52] 🔁 Loop ke-6
+[worker-browsesnap2][2025-07-28 18:53:52] 🔧 Menjalankan perintah: go run main.go
+✅ sukses tsk: 638474
+✅ sukses clt: 201 Created
+✅ today task completed = 29
+✅ next payment 397920
+[worker-browsesnap2][2025-07-28 18:53:59] ✅ Loop ke-6 selesai
+[worker-browsesnap2][2025-07-28 18:53:59] 🔁 Loop ke-7
+[worker-browsesnap2][2025-07-28 18:53:59] 🔧 Menjalankan perintah: go run main.go
+✅ sukses tsk: 638478
+✅ sukses clt: 201 Created
+✅ today task completed = 30
+✅ next payment 398000
+[worker-browsesnap2][2025-07-28 18:54:05] ✅ Loop ke-7 selesai
+[worker-browsesnap2][2025-07-28 18:54:05] 🔁 Loop ke-8
+[worker-browsesnap2][2025-07-28 18:54:05] 🔧 Menjalankan perintah: go run main.go
+✅ sukses tsk: 638487
+✅ sukses clt: 201 Created
+✅ today task completed = 31
+✅ next payment 398080
+[worker-browsesnap2][2025-07-28 18:54:14] ✅ Loop ke-8 selesai
+[worker-browsesnap2][2025-07-28 18:54:14] 🔁 Loop ke-9
+[worker-browsesnap2][2025-07-28 18:54:14] 🔧 Menjalankan perintah: go run main.go
+⚠️  Tidak ada task valid, retry...

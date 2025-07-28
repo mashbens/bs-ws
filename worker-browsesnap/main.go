@@ -81,9 +81,11 @@ func main() {
 	authB64 := base64.StdEncoding.EncodeToString([]byte(email + ":" + pass))
 
 	// ===== GET /tasks loop until found =====
+	token := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`{"shopee_username":"%s","shopee_user_id":"%s"}`, sUsername, sID)))
+
 	taskHeaders := map[string]string{
 		"Authorization":      "Basic " + authB64,
-		"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
+		"bs-user-data":       token,
 		"User-Agent":         ua,
 		"sec-ch-ua":          chUA,
 		"sec-ch-ua-mobile":   "?0",

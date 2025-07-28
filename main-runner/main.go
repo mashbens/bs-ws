@@ -3,14 +3,15 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
+	"time"
 )
 
 var workers = []string{
@@ -18,8 +19,8 @@ var workers = []string{
 	"worker-browsesnap2",
 	"worker-browsesnap3",
 	"worker-browsesnap4",
-	"worker-browsesnap5",
-	"worker-browsesnap6",
+	// "worker-browsesnap5",
+	// "worker-browsesnap6",
 }
 
 var logMutex = &sync.Mutex{}
@@ -47,31 +48,59 @@ func startWorkers(loopCount int) {
 	}
 }
 
-func runWorker(worker string, loopCount int) {
-	// Dapatkan absolute path ke direktori bs-work-space
-	baseDir := "/home/bens/projects/myrepo/bs-work-space"
+func writeLog(f *os.File, worker, message string) {
+	logLine := fmt.Sprintf("[%s][%s] %s\n", worker, time.Now().Format("2006-01-02 15:04:05"), message)
+	_, err := f.WriteString(logLine)
+	if err != nil {
+		fmt.Printf("❌ Gagal menulis log ke file: %v\n", err)
+	}
+}
 
-	// Path untuk log file
+func runWorker(worker string, loopCount int) {
+	// Dapatkan absolute path ke direktori sekarang
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		if filepath.Base(cwd) == "bs-ws" || cwd == "/" {
+			break
+		}
+		cwd = filepath.Dir(cwd)
+	}
+
+	if filepath.Base(cwd) != "bs-ws" {
+		log.Fatal("🛑 Tidak menemukan folder 'bs-ws' di path manapun.")
+	}
+
+	baseDir := cwd
+
+	// Path ke direktori log
 	logFile := filepath.Join(baseDir, "logs", worker+".log")
 	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		log.Printf("❌ Gagal buat log untuk %s: %v", worker, err)
+		fmt.Printf("❌ Gagal buat log untuk %s: %v\n", worker, err)
 		return
 	}
 	defer f.Close()
 
+	// Semua log.* akan diarahkan ke file log
+	log.SetOutput(f)
+
 	// Path ke direktori worker
 	workerDir := filepath.Join(baseDir, worker)
-
-	log.Printf("🚀 Menjalankan %s dari %s", worker, workerDir)
+	writeLog(f, worker, fmt.Sprintf("🚀 Menjalankan worker di %s", workerDir))
 
 	for i := 1; i <= loopCount; i++ {
 		writeLog(f, worker, fmt.Sprintf("🔁 Loop ke-%d", i))
 
 		cmd := exec.Command("go", "run", "main.go")
-		cmd.Dir = workerDir // Gunakan absolute path
+		cmd.Dir = workerDir
 		cmd.Stdout = f
 		cmd.Stderr = f
+
+		writeLog(f, worker, "🔧 Menjalankan perintah: go run main.go")
 
 		if err := cmd.Run(); err != nil {
 			writeLog(f, worker, fmt.Sprintf("❌ Error di loop ke-%d: %v", i, err))
@@ -80,19 +109,20 @@ func runWorker(worker string, loopCount int) {
 
 		writeLog(f, worker, fmt.Sprintf("✅ Loop ke-%d selesai", i))
 	}
+
 	writeLog(f, worker, fmt.Sprintf("🎉 Worker %s selesai", worker))
 }
 
-func writeLog(f *os.File, worker, message string) {
-	logMutex.Lock()
-	defer logMutex.Unlock()
+// func writeLog(f *os.File, worker, message string) {
+// 	logMutex.Lock()
+// 	defer logMutex.Unlock()
 
-	line := fmt.Sprintf("%s\n", message)
-	if _, err := f.WriteString(line); err != nil {
-		log.Printf("❌ Gagal menulis log untuk %s: %v", worker, err)
-	}
-	fmt.Print(line) // Tampilkan juga di console
-}
+// 	line := fmt.Sprintf("%s\n", message)
+// 	if _, err := f.WriteString(line); err != nil {
+// 		log.Printf("❌ Gagal menulis log untuk %s: %v", worker, err)
+// 	}
+// 	fmt.Print(line) // Tampilkan juga di console
+// }
 
 // Handler untuk mulai workers
 func handleStartWorkers(w http.ResponseWriter, r *http.Request) {
@@ -113,14 +143,38 @@ func handleStartWorkers(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Started workers with %d loops each", body.Loop)
 }
 
+func getLogPath(worker string) (string, error) {
+	// Ambil path file Go saat runtime
+	_, filename, _, ok := runtime.Caller(0)
+	if !ok {
+		return "", fmt.Errorf("failed to get runtime caller")
+	}
+
+	// filename = /home/bens/project/myrepo/bs-ws/main-runner/namafile.go
+	baseDir := filepath.Dir(filename)           // /main-runner
+	projectRoot := filepath.Join(baseDir, "..") // /bs-ws
+
+	logsDir := filepath.Join(projectRoot, "logs")
+	return filepath.Join(logsDir, worker+".log"), nil
+}
+
 // Handler untuk melihat log
 func handleSingleLog(w http.ResponseWriter, r *http.Request) {
 	worker := strings.TrimPrefix(r.URL.Path, "/logs/")
-	data, err := ioutil.ReadFile("logs/" + worker + ".log")
+
+	logPath, err := getLogPath(worker)
 	if err != nil {
-		http.Error(w, "Log not found", http.StatusNotFound)
+		http.Error(w, "Failed to resolve log path", http.StatusInternalServerError)
 		return
 	}
+	log.Println("logPath:", logPath)
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		http.Error(w, "Log not found: "+err.Error(), http.StatusNotFound)
+		return
+	}
+
+	log.Println("📄 Membaca log:", logPath) // Tambahkan debug
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(data)
 }
