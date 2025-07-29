@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -26,11 +25,13 @@ const (
 	LP        = 0
 )
 
+
 type TaskResponse struct {
 	Task struct {
 		APIURL     string `json:"api_url"`
 		WebsiteURL string `json:"website_url"`
 		TaskID     int    `json:"task_id"`
+		Detail     string `json:"detail"`
 	} `json:"task"`
 	Detail string `json:"detail"`
 }
@@ -74,15 +75,18 @@ func main() {
 
 	email := email
 	pass := password
-	sUsername := sUsername
-	sID := sID
-	isID, _ := strconv.Atoi(sID)
+	// sUsername := sUsername
+	// sID := sID
+	// isID, _ := strconv.Atoi(sID)
 	resBody := os.Getenv("RESPONSE_BODY")
 	authB64 := base64.StdEncoding.EncodeToString([]byte(email + ":" + pass))
 
 	// ===== GET /tasks loop until found =====
+	token := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf(`{"shopee_username":"%s","shopee_user_id":"%s"}`, sUsername, sID)))
+
 	taskHeaders := map[string]string{
 		"Authorization":      "Basic " + authB64,
+		"bs-user-data":       token,
 		"User-Agent":         ua,
 		"sec-ch-ua":          chUA,
 		"sec-ch-ua-mobile":   "?0",
@@ -122,6 +126,7 @@ func main() {
 		// ===== POST /collect-user-behaviour =====
 		behaviourHeaders := map[string]string{
 			"Authorization":      "Basic " + authB64,
+			"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
 			"Accept":             "*/*",
 			"Accept-Language":    "en-US,en;q=0.9",
 			"User-Agent":         ua,
@@ -144,8 +149,57 @@ func main() {
 		apiURL := task.Task.APIURL
 		sourceURL := task.Task.WebsiteURL
 
-		payload := fmt.Sprintf(`{"request":{"url":"%s","method":"GET","request_headers":{"Accept":"application/json","Content-Type":"application/json","X-Shopee-Language":"id","X-Requested-With":"XMLHttpRequest","X-CSRFToken":"%s","X-API-SOURCE":"pc","af-ac-enc-dat":"%s","sz-token":"%s","x-sz-sdk-version":"1.12.20","x-sap-ri":"%s","x-sap-sec":"%s","af-ac-enc-sz-token":"%s","d-nonptcha-sync":"%s"},"request_body":null,"response_headers":{"alt-svc":"","content-encoding":"gzip","content-type":"application/json","date":"%s","server":"SGW","vary":"Accept-Encoding","x-request-id":"%s"},"response_body":"%s","response_status":200,"response_time":"%s","response_type":"basic"},"user_data":{"shopee_username":"%s","shopee_user_id":%d},"source_url":"%s"}`,
-			apiURL, csrf, af_ac_enc_dat, sz, x_sap_ri, x_sap_sec, af_ac_enc_sz_token, d_non_ptcha, date, x_request_id, resBody, rand_time, sUsername, isID, sourceURL)
+		payload := fmt.Sprintf(`{
+		"request": {
+			"url": "%s",
+			"method": "GET",
+			"request_headers": {
+				"Accept": "application/json",
+				"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
+				"Content-Type": "application/json",
+				"X-Shopee-Language": "id",
+				"X-Requested-With": "XMLHttpRequest",
+				"X-CSRFToken": "%s",
+				"X-API-SOURCE": "pc",
+				"af-ac-enc-dat": "%s",
+				"sz-token": "%s",
+				"x-sz-sdk-version": "1.12.20",
+				"x-sap-ri": "%s",
+				"x-sap-sec": "%s",
+				"af-ac-enc-sz-token": "%s",
+				"d-nonptcha-sync": "%s"
+			},
+			"request_body": null,
+			"response_headers": {
+				"alt-svc": "",
+				"content-encoding": "gzip",
+				"content-type": "application/json",
+				"date": "%s",
+				"server": "SGW",
+				"vary": "Accept-Encoding",
+				"x-request-id": "%s"
+			},
+			"response_body": "%s",
+			"response_status": 200,
+			"response_time": "%s",
+			"response_type": "basic"
+		},
+		"source_url": "%s"
+	}`,
+			apiURL,
+			csrf,
+			af_ac_enc_dat,
+			sz,
+			x_sap_ri,
+			x_sap_sec,
+			af_ac_enc_sz_token,
+			d_non_ptcha,
+			date,
+			x_request_id,
+			resBody,
+			rand_time,
+			sourceURL,
+		)
 
 		collectHeaders := behaviourHeaders // same headers
 		respClt, err := makeRequest("POST", baseURL+"/collect", collectHeaders, strings.NewReader(payload))
@@ -164,6 +218,7 @@ func main() {
 	statsURL := baseURL + "/stats?timezone=Asia%2FJakarta"
 	statsHeaders := map[string]string{
 		"Authorization":      "Basic " + authB64,
+		"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
 		"Accept":             "*/*",
 		"Accept-Language":    "en,en-US;q=0.9,id;q=0.8",
 		"User-Agent":         ua,

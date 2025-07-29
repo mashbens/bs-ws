@@ -19,8 +19,8 @@ var workers = []string{
 	"worker-browsesnap2",
 	"worker-browsesnap3",
 	"worker-browsesnap4",
-	// "worker-browsesnap5",
-	// "worker-browsesnap6",
+	"worker-browsesnap5",
+	"worker-browsesnap6",
 }
 
 var logMutex = &sync.Mutex{}
