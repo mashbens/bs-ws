@@ -90,7 +90,6 @@ func runWorker(worker string, loopCount int) {
 
 	// Path ke direktori worker
 	workerDir := filepath.Join(baseDir, worker)
-	writeLog(f, worker, fmt.Sprintf("🚀 Menjalankan worker di %s", workerDir))
 
 	for i := 1; i <= loopCount; i++ {
 		writeLog(f, worker, fmt.Sprintf("🔁 Loop ke-%d", i))
@@ -100,17 +99,15 @@ func runWorker(worker string, loopCount int) {
 		cmd.Stdout = f
 		cmd.Stderr = f
 
-		writeLog(f, worker, "🔧 Menjalankan perintah: go run main.go")
-
 		if err := cmd.Run(); err != nil {
 			writeLog(f, worker, fmt.Sprintf("❌ Error di loop ke-%d: %v", i, err))
 			continue
 		}
 
-		writeLog(f, worker, fmt.Sprintf("✅ Loop ke-%d selesai", i))
+		// writeLog(f, worker, fmt.Sprintf("✅ Loop ke-%d selesai", i))
 	}
 
-	writeLog(f, worker, fmt.Sprintf("🎉 Worker %s selesai", worker))
+	writeLog(f, worker, fmt.Sprintf("🎉 Worker sukses %d selesai ", loopCount))
 }
 
 // func writeLog(f *os.File, worker, message string) {
@@ -167,14 +164,12 @@ func handleSingleLog(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to resolve log path", http.StatusInternalServerError)
 		return
 	}
-	log.Println("logPath:", logPath)
 	data, err := os.ReadFile(logPath)
 	if err != nil {
 		http.Error(w, "Log not found: "+err.Error(), http.StatusNotFound)
 		return
 	}
 
-	log.Println("📄 Membaca log:", logPath) // Tambahkan debug
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(data)
 }
