@@ -25,7 +25,6 @@ const (
 	LP        = 0
 )
 
-
 type TaskResponse struct {
 	Task struct {
 		APIURL     string `json:"api_url"`
@@ -126,7 +125,7 @@ func main() {
 		// ===== POST /collect-user-behaviour =====
 		behaviourHeaders := map[string]string{
 			"Authorization":      "Basic " + authB64,
-			"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
+			"bs-user-data":       token,
 			"Accept":             "*/*",
 			"Accept-Language":    "en-US,en;q=0.9",
 			"User-Agent":         ua,
@@ -155,8 +154,7 @@ func main() {
 			"method": "GET",
 			"request_headers": {
 				"Accept": "application/json",
-				"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
-				"Content-Type": "application/json",
+ 				"Content-Type": "application/json",
 				"X-Shopee-Language": "id",
 				"X-Requested-With": "XMLHttpRequest",
 				"X-CSRFToken": "%s",
@@ -218,7 +216,7 @@ func main() {
 	statsURL := baseURL + "/stats?timezone=Asia%2FJakarta"
 	statsHeaders := map[string]string{
 		"Authorization":      "Basic " + authB64,
-		"bs-user-data":       "eyJzaG9wZWVfdXNlcm5hbWUiOiJhcmlmYnVkaW1hbjE0MTIiLCJzaG9wZWVfdXNlcl9pZCI6IjEyMDIyMDQyNSJ9",
+		"bs-user-data":       token,
 		"Accept":             "*/*",
 		"Accept-Language":    "en,en-US;q=0.9,id;q=0.8",
 		"User-Agent":         ua,
