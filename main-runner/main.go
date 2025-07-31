@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -23,10 +24,13 @@ var workers = []string{
 	"worker-browsesnap6",
 }
 
-var logMutex = &sync.Mutex{}
+var (
+	stopChan    = make(chan struct{})
+	mu          sync.Mutex
+	activeProcs []*os.Process
+)
 
 func main() {
-	// Buat direktori logs di root project
 	logsDir := filepath.Join("..", "logs")
 	if err := os.MkdirAll(logsDir, 0755); err != nil {
 		log.Fatalf("❌ Gagal membuat direktori logs: %v", err)
@@ -35,14 +39,20 @@ func main() {
 	http.HandleFunc("/", serveHTML)
 	http.HandleFunc("/logs/", handleSingleLog)
 	http.HandleFunc("/start", handleStartWorkers)
+	http.HandleFunc("/stop", handleStopWorkers)
 	http.HandleFunc("/update-env", handleUpdateEnv)
 	http.HandleFunc("/get-env", handleGetEnvShared)
+	http.HandleFunc("/clear-logs", handleClearLogs)
 
 	fmt.Println("🌐 Server running at http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func startWorkers(loopCount int) {
+	mu.Lock()
+	stopChan = make(chan struct{})
+	activeProcs = []*os.Process{}
+	mu.Unlock()
 	for _, worker := range workers {
 		go runWorker(worker, loopCount)
 	}
@@ -57,7 +67,6 @@ func writeLog(f *os.File, worker, message string) {
 }
 
 func runWorker(worker string, loopCount int) {
-	// Dapatkan absolute path ke direktori sekarang
 	cwd, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
@@ -75,8 +84,6 @@ func runWorker(worker string, loopCount int) {
 	}
 
 	baseDir := cwd
-
-	// Path ke direktori log
 	logFile := filepath.Join(baseDir, "logs", worker+".log")
 	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -85,43 +92,45 @@ func runWorker(worker string, loopCount int) {
 	}
 	defer f.Close()
 
-	// Semua log.* akan diarahkan ke file log
 	log.SetOutput(f)
-
-	// Path ke direktori worker
 	workerDir := filepath.Join(baseDir, worker)
 
 	for i := 1; i <= loopCount; i++ {
-		writeLog(f, worker, fmt.Sprintf("🔁 Loop ke-%d", i))
+		select {
+		case <-stopChan:
+			writeLog(f, worker, "⛔ Worker dihentikan secara paksa")
+			return
+		default:
+		}
 
+		writeLog(f, worker, fmt.Sprintf("🔁 Loop ke-%d", i))
 		cmd := exec.Command("go", "run", "main.go")
 		cmd.Dir = workerDir
 		cmd.Stdout = f
 		cmd.Stderr = f
 
-		if err := cmd.Run(); err != nil {
-			writeLog(f, worker, fmt.Sprintf("❌ Error di loop ke-%d: %v", i, err))
+		// Pastikan kill group, bukan hanya parent
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+		if err := cmd.Start(); err != nil {
+			writeLog(f, worker, fmt.Sprintf("❌ Tidak bisa start: %v", err))
 			continue
 		}
 
-		// writeLog(f, worker, fmt.Sprintf("✅ Loop ke-%d selesai", i))
+		mu.Lock()
+		activeProcs = append(activeProcs, cmd.Process)
+		mu.Unlock()
+
+		err = cmd.Wait()
+		if err != nil {
+			writeLog(f, worker, fmt.Sprintf("❌ Error di loop ke-%d: %v", i, err))
+			continue
+		}
 	}
 
 	writeLog(f, worker, fmt.Sprintf("🎉 Worker sukses %d selesai ", loopCount))
 }
 
-// func writeLog(f *os.File, worker, message string) {
-// 	logMutex.Lock()
-// 	defer logMutex.Unlock()
-
-// 	line := fmt.Sprintf("%s\n", message)
-// 	if _, err := f.WriteString(line); err != nil {
-// 		log.Printf("❌ Gagal menulis log untuk %s: %v", worker, err)
-// 	}
-// 	fmt.Print(line) // Tampilkan juga di console
-// }
-
-// Handler untuk mulai workers
 func handleStartWorkers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -140,25 +149,36 @@ func handleStartWorkers(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "Started workers with %d loops each", body.Loop)
 }
 
+func handleStopWorkers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	mu.Lock()
+	close(stopChan)
+	for _, p := range activeProcs {
+		if p != nil {
+			syscall.Kill(-p.Pid, syscall.SIGKILL) // negatif = kill seluruh group
+		}
+	}
+	activeProcs = []*os.Process{}
+	mu.Unlock()
+	fmt.Fprint(w, "⛔ Semua workers & proses dihentikan paksa")
+}
+
 func getLogPath(worker string) (string, error) {
-	// Ambil path file Go saat runtime
 	_, filename, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", fmt.Errorf("failed to get runtime caller")
 	}
-
-	// filename = /home/bens/project/myrepo/bs-ws/main-runner/namafile.go
-	baseDir := filepath.Dir(filename)           // /main-runner
-	projectRoot := filepath.Join(baseDir, "..") // /bs-ws
-
+	baseDir := filepath.Dir(filename)
+	projectRoot := filepath.Join(baseDir, "..")
 	logsDir := filepath.Join(projectRoot, "logs")
 	return filepath.Join(logsDir, worker+".log"), nil
 }
 
-// Handler untuk melihat log
 func handleSingleLog(w http.ResponseWriter, r *http.Request) {
 	worker := strings.TrimPrefix(r.URL.Path, "/logs/")
-
 	logPath, err := getLogPath(worker)
 	if err != nil {
 		http.Error(w, "Failed to resolve log path", http.StatusInternalServerError)
@@ -166,15 +186,14 @@ func handleSingleLog(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := os.ReadFile(logPath)
 	if err != nil {
-		http.Error(w, "Log not found: "+err.Error(), http.StatusNotFound)
+		// http.Error(w, "Log not found: "+err.Error(), http.StatusNotFound)
+		http.Error(w, "Log not found", http.StatusNotFound)
 		return
 	}
-
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write(data)
 }
 
-// Handler untuk update environment
 func handleUpdateEnv(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -207,8 +226,23 @@ func handleUpdateEnv(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write([]byte("✅ RESPONSE_BODY updated and env files refreshed.\n"))
 }
+func handleClearLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
 
-// Handler untuk get environment
+	cmd := exec.Command("bash", "clear-logs.sh")
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("failed to clear logs: %s", output), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(string(output)))
+}
+
 func handleGetEnvShared(w http.ResponseWriter, r *http.Request) {
 	data, err := os.ReadFile(".env.shared")
 	if err != nil {
@@ -219,8 +253,6 @@ func handleGetEnvShared(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// HTML UI sederhana
-// func serveHTML(w http.ResponseWriter, r *http.Request) {
 func serveHTML(w http.ResponseWriter, r *http.Request) {
 	html := `<!DOCTYPE html>
 <html lang="en">
@@ -229,84 +261,43 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<title>Worker Monitor</title>
 	<style>
-		body {
-			font-family: Arial, sans-serif;
-			margin: 0;
-			padding: 20px;
-			background-color: #f1f5f9;
+		body {font-family: Arial, sans-serif;margin: 0;padding: 20px;background-color: #f1f5f9;}
+		h1 {font-size: 24px;margin-bottom: 20px;text-align: center;}
+		.container {max-width: 1200px;margin: auto;}
+		.controls {display: flex;flex-wrap: wrap;gap: 10px;margin-bottom: 20px;align-items: center;justify-content: space-between;}
+		input, textarea, button {padding: 8px;border: 1px solid #ccc;border-radius: 6px;font-size: 14px;}
+		button {background-color: #2563eb;color: white;cursor: pointer;}
+		button:hover {background-color: #1d4ed8;}
+
+		/* Grid untuk workers */
+		#workers {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(450px, 1fr));
+			gap: 16px;
 		}
-		h1 {
-			font-size: 24px;
-			margin-bottom: 20px;
-			text-align: center;
-		}
-		.container {
-			max-width: 1000px;
-			margin: auto;
-		}
-		.controls {
-			display: flex;
-			flex-wrap: wrap;
-			gap: 10px;
-			margin-bottom: 20px;
-			align-items: center;
-			justify-content: space-between;
-		}
-		input, textarea, button {
-			padding: 8px;
-			border: 1px solid #ccc;
-			border-radius: 6px;
-			font-size: 14px;
-		}
-		button {
-			background-color: #2563eb;
-			color: white;
-			cursor: pointer;
-		}
-		button:hover {
-			background-color: #1d4ed8;
-		}
-		.worker {
-			background-color: white;
-			border-radius: 8px;
-			box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-			margin-bottom: 16px;
-			padding: 16px;
-		}
-		.worker h3 {
-			margin: 0 0 8px 0;
-			font-size: 18px;
-		}
-		.log {
-			background-color: #f3f4f6;
-			height: 200px;
-			overflow-y: auto;
-			padding: 10px;
-			border-radius: 6px;
-			font-size: 13px;
-			white-space: pre-wrap;
-		}
+
+		.worker {background-color: white;border-radius: 8px;box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);padding: 16px;}
+		.worker h3 {margin: 0 0 8px 0;font-size: 18px;}
+		.log {background-color: #f3f4f6;height: 200px;overflow-y: auto;padding: 10px;border-radius: 6px;font-size: 13px;white-space: pre-wrap;}
 	</style>
 </head>
 <body>
 	<div class="container">
 		<h1>Worker Monitor</h1>
-
 		<div class="controls">
 			<div>
 				<input type="number" id="loopCount" min="1" value="1" placeholder="Loop count">
 				<button onclick="startWorkers()">Start Workers</button>
+				<button onclick="stopWorkers()">Stop All Workers</button>
+				<button onclick="clearLogs()">Clear Logs</button>
 			</div>
 			<div>
 				<textarea id="responseBody" placeholder="RESPONSE_BODY" rows="2" cols="40"></textarea><br>
 				<button onclick="updateEnv()">Update Environment</button>
 			</div>
-			
 		</div>
-
 		<div id="workers"></div>
 	</div>
-
 	<script>
 		const workers = %s;
 
@@ -320,20 +311,6 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 			});
 			document.getElementById("workers").innerHTML = html;
 		}
-		
-		function clearLogs() {
-			if (!confirm("Yakin ingin menghapus semua log?")) return;
-
-			fetch("/clear-logs", {
-				method: "POST"
-			})
-			.then(r => r.text())
-			.then(msg => {
-				alert(msg);
-				workers.forEach(viewLog); // Refresh log tampilan
-			});
-		}
-
 
 		function startWorkers() {
 			const loopCount = document.getElementById("loopCount").value;
@@ -342,6 +319,17 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({ loop: parseInt(loopCount) })
 			}).then(() => alert("Workers started"));
+		}
+
+		function stopWorkers() {
+			fetch("/stop", { method: "POST" }).then(() => alert("Workers stopped"));
+		}
+
+		function clearLogs() {
+			if (!confirm("Yakin hapus semua log?")) return;
+			fetch("/clear-logs", { method: "POST" })
+				.then(r => r.text())
+				.then(msg => alert(msg));
 		}
 
 		function updateEnv() {
@@ -365,12 +353,10 @@ func serveHTML(w http.ResponseWriter, r *http.Request) {
 				});
 		}
 
-		// Auto-load log setiap 3 detik
 		setInterval(() => {
 			workers.forEach(viewLog);
 		}, 3000);
 
-		// Load environment saat awal
 		fetch("/get-env")
 			.then(r => r.text())
 			.then(text => {

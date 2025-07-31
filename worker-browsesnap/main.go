@@ -20,9 +20,11 @@ const (
 	baseURL   = "https://browsesnap.com"
 	email     = "bens.sky69@gmail.com"
 	password  = "QWEASD123"
-	sUsername = "benssky123"
-	sID       = "1533175761"
-	LP        = 737080
+	sUsername = "bensky6991"
+	sID       = "1566713262"
+	// sUsername = "benssky123"
+	// sID       = "1533175761"
+	LP = 737080
 )
 
 type TaskResponse struct {
@@ -111,12 +113,20 @@ func main() {
 			foundTask = true
 			fmt.Println("✅ sukses tsk:", task.Task.TaskID)
 		} else if task.Detail == "User has reached the task limit" {
-			fmt.Println("🤷‍♂️  Sudah limit, task kosong")
+			fmt.Println("🤷‍♂️  User has reached the task limit")
+			return
+		} else if task.Detail == "No task available" {
+			fmt.Println("😢 ", task.Detail)
+			return
+
+		} else if strings.Contains(strings.ToLower(task.Detail), "blokir") {
+			fmt.Println("🤷 ", task.Detail)
 			return
 		} else {
 			fmt.Println("⚠️  Tidak ada task valid, retry...")
 			time.Sleep(2 * time.Second)
 		}
+
 	}
 
 	if foundTask {

@@ -20,8 +20,8 @@ const (
 	baseURL   = "https://browsesnap.com"
 	email     = "fitriapipit080100@gmail.com"
 	password  = "QWEASD123"
-	sUsername = "fitria080100"
-	sID       = "1513211342"
+	sUsername = "fitriafitria001"
+	sID       = "1512345678"
 	LP        = 708000
 )
 
@@ -111,7 +111,14 @@ func main() {
 			foundTask = true
 			fmt.Println("✅ sukses tsk:", task.Task.TaskID)
 		} else if task.Detail == "User has reached the task limit" {
-			fmt.Println("🤷‍♂️  Sudah limit, task kosong")
+			fmt.Println("🤷‍♂️  User has reached the task limit")
+			return
+		} else if task.Detail == "No task available" {
+			fmt.Println("😢 ", task.Detail)
+			return
+
+		} else if strings.Contains(strings.ToLower(task.Detail), "blokir") {
+			fmt.Println("🤷 ", task.Detail)
 			return
 		} else {
 			fmt.Println("⚠️  Tidak ada task valid, retry...")
