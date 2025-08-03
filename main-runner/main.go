@@ -22,6 +22,9 @@ var workers = []string{
 	"worker-browsesnap4",
 	"worker-browsesnap5",
 	"worker-browsesnap6",
+	"worker-browsesnap7",
+	"worker-browsesnap8",
+	"worker-browsesnap9",
 }
 
 var (
